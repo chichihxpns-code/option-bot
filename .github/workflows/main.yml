@@ -15,7 +15,7 @@ jobs:
         with:
           python-version: '3.9'
       - name: Install dependencies
-        run: pip install FinMind pandas
+        run: pip install FinMind pandas tqdm 
       - name: Run script
         run: python run_ma.py
 
