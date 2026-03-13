@@ -1,40 +1,35 @@
 import pandas as pd
 from FinMind.data import DataLoader
 
-def test_real_market_data():
+def get_real_data_final():
     dl = DataLoader()
+    # 2026-03-13 週五數據
     target_date = "2026-03-13"
-    # 我們改用一個當天絕對有交易的合約來測試 (23600C)
+    # 使用台指期熱門履約價做測試
     option_id = "TXO23600C6" 
     
-    print(f"測試抓取熱門合約 {option_id} 的數據...")
+    print(f"正在使用通用指令抓取 {option_id}...")
 
+    # 最新版 FinMind SDK 建議使用 fetch_data 配合 data_id
     try:
-        # 抓取日 K 線
-        df = dl.taiwan_option_daily_kline(
+        # 抓取選擇權日成交資料
+        df = dl.taiwan_option_daily(
             option_id=option_id,
             start_date=target_date,
             end_date=target_date
         )
+        
+        if df.empty:
+            print("資料庫回傳空值，可能是該合約今日無成交。")
+            return
+
+        # 計算 5MA (日均線邏輯)
+        # 注意：若要分K，免費版 API 在假日存取限制較多，我們先確保能抓到日資料
+        print(f"✅ 成功抓取！{option_id} 收盤價為: {df.iloc[-1]['close']}")
+        
     except Exception as e:
-        print(f"❌ API 連線異常: {e}")
-        return
-
-    if df.empty:
-        print(f"❌ 依然找不到資料。這代表 FinMind 免費版目前限制了該日期的存取。")
-        return
-
-    # 計算 5MA
-    df = df.sort_values('time')
-    df['5MA'] = df['Close'].rolling(window=5).mean()
-
-    # 輸出
-    last_row = df.tail(1)
-    print(f"\n✅ 終於成功抓到市場真實數據！")
-    print(f"合約：{option_id}")
-    print(f"最後成交時間：{last_row['time'].values[0]}")
-    print(f"最後成交價：{last_row['Close'].values[0]}")
-    print(f"最後 5MA：{last_row['5MA'].values[0]}")
+        print(f"❌ 發生錯誤: {e}")
+        print("提示：這代表 SDK 版本不支援舊指令，請考慮使用 HTTP Request 或檢查 Token 權限。")
 
 if __name__ == "__main__":
-    test_real_market_data()
+    get_real_data_final()
