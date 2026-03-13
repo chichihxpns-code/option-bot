@@ -2,26 +2,19 @@ name: Get_Option_5MA_Daily
 
 on:
   schedule:
-    # 台灣時間週一至週五 13:50 執行 (UTC 05:50)
     - cron: '50 5 * * 1-5'
-  workflow_dispatch: # 允許手動點擊按鈕執行
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: 複製儲存庫內容
-        uses: actions/checkout@v3
-
-      - name: 設定 Python 環境
+      - uses: actions/checkout@v3
+      - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
-
-      - name: 安裝必要套件
-        run: |
-          pip install FinMind pandas
-
-      - name: 執行計算腳本
+      - name: Install dependencies
+        run: pip install FinMind pandas
+      - name: Run script
         run: python run_ma.py
