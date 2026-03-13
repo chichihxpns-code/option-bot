@@ -1,9 +1,9 @@
 name: Get_Option_5MA_Daily
 
 on:
+  workflow_dispatch:
   schedule:
     - cron: '50 5 * * 1-5'
-  workflow_dispatch:
 
 jobs:
   build:
@@ -18,3 +18,4 @@ jobs:
         run: pip install FinMind pandas
       - name: Run script
         run: python run_ma.py
+
