@@ -1,65 +1,46 @@
 import pandas as pd
 from FinMind.data import DataLoader
-import datetime
 
 def get_33000c_5ma():
     dl = DataLoader()
     
-    # 強制設定為上週三，確保一定有資料
+    # 1. 直接指定日期與代碼 (3月W2結算日為 03-11)
     target_date = "2026-03-11"
+    option_id = "TXO33000C6" 
     
-    print(f"正在查詢 {target_date} 的 33000C 合約...")
+    print(f"正在抓取 {target_date} 合約 {option_id} 的行情...")
 
-    # 1. 修正後的搜尋代碼方式 (使用 taiwan_option_static 資料表)
+    # 2. 直接抓取日分 K 資料
     try:
-        opt_info = dl.taiwan_option_static()
-    except:
-        # 如果上面的不行，嘗試另一個常用指令
-        opt_info = dl.taiwan_option_info()
-    
-    # 篩選 33000 Call
-    target_contracts = opt_info[
-        (opt_info['strike_price'] == 33000) & 
-        (opt_info['call_put'].str.lower() == 'call')
-    ]
-    
-    if target_contracts.empty:
-        print("找不到 33000C 合約，請檢查履約價是否正確。")
+        df = dl.taiwan_option_daily_kline(
+            option_id=option_id,
+            start_date=target_date,
+            end_date=target_date
+        )
+    except Exception as e:
+        print(f"API 抓取失敗: {e}")
         return
-
-    # 取得第一個合約 ID (通常是當週週選)
-    option_id = target_contracts.iloc[0]['option_id']
-    print(f"找到代碼: {option_id}")
-
-    # 2. 抓取分 K 資料 (修正參數名稱)
-    df = dl.taiwan_option_daily_kline(
-        option_id=option_id,
-        start_date=target_date,
-        end_date=target_date
-    )
 
     if df.empty:
-        print(f"合約 {option_id} 在 {target_date} 無成交資料。")
+        print(f"找不到資料！請確認代碼 {option_id} 是否正確，或日期 {target_date} 是否有交易。")
         return
 
-    # 3. 整理資料並計算 5MA
-    df['date_time'] = pd.to_datetime(df['date'] + ' ' + df['time'])
-    df = df.sort_values('date_time')
-    
-    # 計算收盤價的 5 根 K 棒移動平均
+    # 3. 計算 5MA
+    df = df.sort_values('time')
     df['5MA'] = df['Close'].rolling(window=5).mean()
 
-    # 4. 篩選 13:45 的數據
+    # 4. 尋找 13:45 的數據
     result = df[df['time'] == '13:45:00']
     
     if not result.empty:
         val = result.iloc[0]['5MA']
-        print(f"✅ 計算成功！")
-        print(f"合約: {option_id}")
-        print(f"時間: 13:45")
-        print(f"5MA 價格: {val}")
+        print(f"\n✅ 計算成功！")
+        print(f"合約：{option_id}")
+        print(f"13:45 的 5MA 價格為：{val}")
     else:
-        print("找不到 13:45 的數據，可能該分鐘無成交。")
+        # 如果剛好沒成交，顯示最後一筆
+        last_val = df.tail(1)['5MA'].values[0]
+        print(f"13:45 無成交，最後一筆 5MA 為：{last_val}")
 
 if __name__ == "__main__":
     get_33000c_5ma()
