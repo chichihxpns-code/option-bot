@@ -7,7 +7,7 @@ def get_33000c_5ma():
     
     # 自動抓取「昨天」或「今天」的日期 (因為 13:45 執行時，當天資料已產生)
     # 若在非交易日執行，建議手動改為最近的週三
-    target_date = datetime.now().strftime("%Y-%m-%d")
+    target_date = "2026-03-11"
     
     print(f"執行時間: {datetime.now()}")
     print(f"正在查詢 {target_date} 的 33000C 合約...")
