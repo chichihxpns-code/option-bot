@@ -3,7 +3,7 @@ import requests
 
 def analyze_support_resistance():
     # 1. 拿出你剛剛申請的 VIP 通行證
-    token = "請把你的TOKEN貼在這裡"
+    token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNi0wMS0zMCAwODoxNToxMSIsInVzZXJfaWQiOiJkZW5uaXNsaW45OTk5IiwiZW1haWwiOiJkZW5uaXNsaW45OTk5QGdtYWlsLmNvbSIsImlwIjoiNjAuMjQ4LjE4LjIxMCJ9.XlLccdGIeJRr2hM23_B3yolW2I-hszdGEwcBffYxMA8"
     target_date = "2026-03-13"
 
     print(f"🚀 繞過網頁防火牆！使用 Token 直連資料庫，分析 {target_date} 籌碼...\n")
