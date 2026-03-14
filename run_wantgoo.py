@@ -3,14 +3,11 @@ import requests
 import io
 
 def fetch_taifex_oi():
-    # 注意：期交所的日期格式必須是 YYYY/MM/DD
     target_date = "2026/03/13"
     print(f"🚀 直接連線【台灣期交所】官方主機，下載 {target_date} 籌碼資料...\n")
 
-    # 期交所隱藏的 CSV 下載 API 網址
     url = "https://www.taifex.com.tw/cht/3/optDataDown"
     
-    # 告訴期交所我們要下載什麼：down_type=1 (每日行情), commodity_id=TXO (台指選擇權)
     payload = {
         "down_type": "1",
         "commodity_id": "TXO",
@@ -19,11 +16,11 @@ def fetch_taifex_oi():
     }
 
     try:
-        # 1. 發送 POST 請求直接下載資料
+        # 1. 發送請求下載資料
         res = requests.post(url, data=payload)
         res.raise_for_status()
 
-        # 2. 期交所的編碼通常是 Big5，我們將它解碼並轉成 Pandas 表格
+        # 2. 轉成 Pandas 表格
         csv_data = res.content.decode('big5', errors='replace')
         df = pd.read_csv(io.StringIO(csv_data))
 
@@ -33,14 +30,19 @@ def fetch_taifex_oi():
 
         print("✅ 成功從期交所下載原始數據！正在進行 AI 分析...")
 
-        # 3. 資料清洗與整理
-        df.columns = df.columns.str.strip() # 清除欄位名稱的空白
+        df.columns = df.columns.str.strip() 
         
-        # 只看「一般」交易時段 (日盤結算後的未平倉量才是最準的)
+        # 📌 關鍵修正：自動尋找期交所的「未沖銷契約量」欄位
+        oi_col = next((c for c in df.columns if '未沖銷' in c or '未平倉' in c), None)
+        
+        if not oi_col:
+            print(f"❌ 找不到未平倉欄位！目前的欄位有：{df.columns.tolist()}")
+            return
+
+        # 3. 資料清洗與整理
         if '交易時段' in df.columns:
             df = df[df['交易時段'] == '一般']
 
-        # 找出最近的結算月份 (排除遠月合約的雜訊，就像玩股網那樣)
         contracts = df['到期月份(週別)'].unique()
         contracts = sorted([str(c).strip() for c in contracts if str(c).strip() != ''])
         target_contract = contracts[0]
@@ -50,30 +52,30 @@ def fetch_taifex_oi():
 
         # 轉換數字格式
         df['履約價'] = pd.to_numeric(df['履約價'], errors='coerce')
-        df['未平倉合約數'] = pd.to_numeric(df['未平倉合約數'], errors='coerce').fillna(0)
+        df[oi_col] = pd.to_numeric(df[oi_col], errors='coerce').fillna(0)
         df['買賣權'] = df['買賣權'].str.strip()
 
-        # 分離買權 (Call) 和賣權 (Put)
+        # 分離買權與賣權
         calls = df[df['買賣權'] == 'Call']
         puts = df[df['買賣權'] == 'Put']
 
         # 加總相同履約價的未平倉量
-        calls_oi = calls.groupby('履約價')['未平倉合約數'].sum().reset_index()
-        puts_oi = puts.groupby('履約價')['未平倉合約數'].sum().reset_index()
+        calls_oi = calls.groupby('履約價')[oi_col].sum().reset_index()
+        puts_oi = puts.groupby('履約價')[oi_col].sum().reset_index()
 
-        # 合併成左右對稱的「支撐壓力表」
+        # 合併成「支撐壓力表」
         sr_table = pd.merge(calls_oi, puts_oi, on='履約價', how='outer', suffixes=('_call', '_put')).fillna(0)
         sr_table = sr_table.sort_values('履約價')
 
         # 4. 尋找最大支撐與壓力
-        max_call_idx = sr_table['未平倉合約數_call'].idxmax()
-        max_put_idx = sr_table['未平倉合約數_put'].idxmax()
+        max_call_idx = sr_table[f'{oi_col}_call'].idxmax()
+        max_put_idx = sr_table[f'{oi_col}_put'].idxmax()
 
         resistance_strike = sr_table.loc[max_call_idx, '履約價']
-        resistance_vol = sr_table.loc[max_call_idx, '未平倉合約數_call']
+        resistance_vol = sr_table.loc[max_call_idx, f'{oi_col}_call']
 
         support_strike = sr_table.loc[max_put_idx, '履約價']
-        support_vol = sr_table.loc[max_put_idx, '未平倉合約數_put']
+        support_vol = sr_table.loc[max_put_idx, f'{oi_col}_put']
 
         # 5. 印出漂亮的分析報告
         print("\n📊 【官方選擇權支撐壓力表 (節錄)】")
@@ -81,10 +83,9 @@ def fetch_taifex_oi():
         print(f"{'買權OI (壓力)':>12} | {'履約價':>8} | {'賣權OI (支撐)':>12}")
         print("-" * 50)
 
-        # 只顯示防守口數大於 2000 口的關鍵區域
-        display_df = sr_table[(sr_table['未平倉合約數_call'] > 2000) | (sr_table['未平倉合約數_put'] > 2000)]
+        display_df = sr_table[(sr_table[f'{oi_col}_call'] > 2000) | (sr_table[f'{oi_col}_put'] > 2000)]
         for _, row in display_df.iterrows():
-            print(f"{int(row['未平倉合約數_call']):>14} | {int(row['履約價']):>8} | {int(row['未平倉合約數_put']):>14}")
+            print(f"{int(row[f'{oi_col}_call']):>14} | {int(row['履約價']):>8} | {int(row[f'{oi_col}_put']):>14}")
         print("==================================================")
 
         print("\n🤖 【AI 盤勢籌碼重點分析】")
