@@ -32,7 +32,7 @@ def fetch_taifex_oi():
 
         df.columns = df.columns.str.strip() 
         
-        # 📌 關鍵修正：自動尋找期交所的「未沖銷契約量」欄位
+        # 自動尋找期交所的「未沖銷契約量」欄位
         oi_col = next((c for c in df.columns if '未沖銷' in c or '未平倉' in c), None)
         
         if not oi_col:
@@ -43,21 +43,27 @@ def fetch_taifex_oi():
         if '交易時段' in df.columns:
             df = df[df['交易時段'] == '一般']
 
-        contracts = df['到期月份(週別)'].unique()
+        contracts = df['到期月份(週別)'].dropna().unique()
         contracts = sorted([str(c).strip() for c in contracts if str(c).strip() != ''])
+        if not contracts:
+            print("❌ 找不到任何合約月份。")
+            return
+            
         target_contract = contracts[0]
         print(f"📌 自動鎖定近期結算合約：{target_contract}")
 
-        df = df[df['到期月份(週別)'].str.strip() == target_contract]
+        df = df[df['到期月份(週別)'].astype(str).str.strip() == target_contract]
 
         # 轉換數字格式
         df['履約價'] = pd.to_numeric(df['履約價'], errors='coerce')
         df[oi_col] = pd.to_numeric(df[oi_col], errors='coerce').fillna(0)
-        df['買賣權'] = df['買賣權'].str.strip()
+        
+        # 📌 關鍵修正：把中文的「買權/賣權」和英文的「Call/Put」全部包起來抓！
+        buy_call_mask = df['買賣權'].astype(str).str.contains('Call|買|C', case=False, na=False)
+        sell_put_mask = df['買賣權'].astype(str).str.contains('Put|賣|P', case=False, na=False)
 
-        # 分離買權與賣權
-        calls = df[df['買賣權'] == 'Call']
-        puts = df[df['買賣權'] == 'Put']
+        calls = df[buy_call_mask]
+        puts = df[sell_put_mask]
 
         # 加總相同履約價的未平倉量
         calls_oi = calls.groupby('履約價')[oi_col].sum().reset_index()
@@ -66,6 +72,11 @@ def fetch_taifex_oi():
         # 合併成「支撐壓力表」
         sr_table = pd.merge(calls_oi, puts_oi, on='履約價', how='outer', suffixes=('_call', '_put')).fillna(0)
         sr_table = sr_table.sort_values('履約價')
+        
+        # 🛡️ 終極防呆機制：如果表還是空的，直接印出原因，不要當機
+        if sr_table.empty:
+            print(f"❌ 嚴重錯誤：篩選後的表格是空的！期交所的買賣權欄位內容是：{df['買賣權'].unique().tolist()}")
+            return
 
         # 4. 尋找最大支撐與壓力
         max_call_idx = sr_table[f'{oi_col}_call'].idxmax()
