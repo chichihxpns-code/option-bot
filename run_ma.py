@@ -3,7 +3,7 @@ import requests
 
 def get_33000c_ultimate():
     # 1. 放入你的 Token
-    token = "請把你的TOKEN貼在這裡"
+    token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNi0wMS0zMCAwODoxNToxMSIsInVzZXJfaWQiOiJkZW5uaXNsaW45OTk5IiwiZW1haWwiOiJkZW5uaXNsaW45OTk5QGdtYWlsLmNvbSIsImlwIjoiNjAuMjQ4LjE4LjIxMCJ9.XlLccdGIeJRr2hM23_B3yolW2I-hszdGEwcBffYxMA8"
     target_date = "2026-03-13"
     
     # 3月13日是第二週週五，接下來要結算的是「第三週(月選) TXO」或「第四週 TX4」
